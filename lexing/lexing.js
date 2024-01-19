@@ -39,6 +39,13 @@ function lex() {
             continue;
         }
 
+        const identifier = lexIdentifier();
+        if (identifier) {
+            console.log("identifier", identifier);
+            consume(identifier);
+            continue;
+        }
+
         throw new Error("failed to lex, bad token");
     }
 }
@@ -75,12 +82,24 @@ function advanceBy(n) {
 }
 
 function nextIs(s) {
-    return rest().length >= s.length && rest().substring(0, s.length) == s;
+    if (s instanceof RegExp) {
+        return !!rest().match(s);
+    } else {
+        return rest().length >= s.length && rest().substring(0, s.length) == s;
+    }
 }
 
 function consume(s) {
     assert(nextIs(s), `expected to consume "${s}" but saw "${rest().substring(0, s.length)}" instead`);
     return advanceBy(s.length);
+}
+
+function consumeIfMatch(r) {
+    if (nextIs(r)) {
+        const m = rest().match(r);
+        return m[0];
+    }
+    return null;
 }
 
 function consumeWhitespaceAndComments() {
@@ -130,6 +149,11 @@ function lexKeyword() {
         }
     }
     return null;
+}
+
+function lexIdentifier() {
+    // TODO: universal-character-name, I guess, bleh
+    return consumeIfMatch(/^[a-zA-Z_][a-zA-Z0-9_]*/);
 }
 
 input.addEventListener('input', () => {
