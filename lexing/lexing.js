@@ -44,6 +44,12 @@ function lex() {
             continue;
         }
 
+        const str = lexStringLiteral();
+        if (str) {
+            console.log("string", str);
+            continue;
+        }
+
         const identifier = lexIdentifier();
         if (identifier) {
             console.log("identifier", identifier);
@@ -274,6 +280,7 @@ function lexFloatingConstant() {
 }
 
 const reCharConstant = /^L?'([^'\\\n]|\\['"?\\abfnrtv]|\\[0-7]{1,3}|\\x[0-9a-fA-F]+|\\(u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))+'/;
+const reStringLiteral = /^L?"([^"\\\n]|\\['"?\\abfnrtv]|\\[0-7]{1,3}|\\x[0-9a-fA-F]+|\\(u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))+"/;
 
 function lexCharacterConstant() {
     const char = consumeIfMatch(reCharConstant);
@@ -281,6 +288,15 @@ function lexCharacterConstant() {
         return { type: "character", value: char };
     }
 
+    return null;
+}
+
+function lexStringLiteral() {
+    const str = consumeIfMatch(reStringLiteral);
+    if (str) {
+        return { type: "string", value: str };
+    }
+    
     return null;
 }
 
