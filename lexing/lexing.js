@@ -10,6 +10,14 @@ let cur;
 let line, col;
 let eof;
 
+const colors = {
+    "keyword": "bg-light-red",
+    "identifier": "bg-light-blue",
+    "integer": "bg-light-purple",
+    "floating": "bg-light-green",
+    "punctuator": "bg-light-silver",
+}
+
 function lex() {
     source = editor.innerText;
     cur = 0;
@@ -21,8 +29,8 @@ function lex() {
         eof = true;
     }
 
-    console.log("starting lex");
-    const tokens = [];
+    const tokens = [];    
+    let err = null;
     while (!eof) {
         consumeWhitespaceAndComments();
         if (eof) {
@@ -65,7 +73,8 @@ function lex() {
             continue;
         }
 
-        throw new Error("failed to lex, bad token");
+        err = "failed to lex, bad token"; // TODO: better error
+        break;
     }
 
     // Highlight tokens
@@ -100,7 +109,7 @@ function lex() {
                 lastCur = nextNewlineCur + 1;
             }
 
-            highlightHTML += `<span class="bg-pink">${ " ".repeat(token.loc.length) }</span>`;
+            highlightHTML += `<span class="${ colors[token.type] }">${ " ".repeat(token.loc.length) }</span>`;
 
             lastCur = token.loc.cur + token.loc.length;
         }
@@ -220,7 +229,8 @@ function lexIdentifierOrKeyword() {
     const ident = consumeIfMatch(/^[a-zA-Z_][a-zA-Z0-9_]*/);
     if (ident) {
         for (const keyword of keywords) {
-            if (ident === keyword) {
+            const str = source.substring(ident.cur, ident.cur + ident.length);
+            if (str === keyword) {
                 return { type: "keyword", loc: ident };
             }
         }
