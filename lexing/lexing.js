@@ -35,14 +35,18 @@ function lex() {
         const keyword = lexKeyword();
         if (keyword) {
             console.log("keyword", keyword);
-            consume(keyword);
             continue;
         }
 
         const identifier = lexIdentifier();
         if (identifier) {
             console.log("identifier", identifier);
-            consume(identifier);
+            continue;
+        }
+
+        const integer = lexIntegerConstant();
+        if (integer) {
+            console.log("integer", integer);
             continue;
         }
 
@@ -95,8 +99,10 @@ function consume(s) {
 }
 
 function consumeIfMatch(r) {
+    assert(r.source[0] === "^", `regexp /${r.source}/ was not anchored to the start of the string!`);
     if (nextIs(r)) {
         const m = rest().match(r);
+        consume(m[0]);
         return m[0];
     }
     return null;
@@ -145,7 +151,8 @@ function consumeWhitespaceAndComments() {
 function lexKeyword() {
     for (const keyword of keywords) {
         if (nextIs(keyword)) {
-            return keyword;
+            consume(keyword);
+            return { type: "keyword", keyword: keyword };
         }
     }
     return null;
@@ -153,7 +160,79 @@ function lexKeyword() {
 
 function lexIdentifier() {
     // TODO: universal-character-name, I guess, bleh
-    return consumeIfMatch(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    const ident = consumeIfMatch(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    if (ident) {
+        return { type: "identifier", name: ident };
+    }
+    return null;
+}
+
+function lexIntegerConstant() {
+    const constant = lexIntegerConstantNoSuffix();
+    if (constant) {
+        lexIntegerSuffix(constant);
+        return constant;
+    }
+    return null;
+}
+
+function lexIntegerConstantNoSuffix() {
+    const decimal = consumeIfMatch(/^[1-9][0-9]*/);
+    if (decimal) {
+        return { type: "integer", subtype: "decimal", value: decimal };
+    }
+
+    const hex = consumeIfMatch(/^0[xX][0-9a-fA-F]*/);
+    if (hex) {
+        return { type: "integer", subtype: "hex", value: hex };
+    }
+
+    const octal = consumeIfMatch(/^0[0-7]*/);
+    if (octal) {
+        return { type: "integer", subtype: "octal", value: octal };
+    }
+
+    return null;
+}
+
+function lexIntegerSuffix(integer) {
+    integer.unsigned = false;
+    integer.longth = null;
+
+    // Unsigned and longth are both optional and can appear in either order.
+    lexIntegerLongth(integer);
+    lexIntegerUnsigned(integer);
+    if (integer.longth === null) {
+        lexIntegerLongth(integer);
+    }
+
+    if (integer.longth === null) {
+        integer.longth = 0;
+    }
+}
+
+function lexIntegerLongth(integer) {
+    const longlong = consumeIfMatch(/^(ll|LL)/);
+    if (longlong) {
+        integer.value += longlong;
+        integer.longth = 2;
+        return;
+    }
+    
+    const long = consumeIfMatch(/^[lL]/);
+    if (long) {
+        integer.value += long;
+        integer.longth = 1;
+        return;
+    }
+}
+
+function lexIntegerUnsigned(integer) {
+    const unsigned = consumeIfMatch(/^[uU]/);
+    if (unsigned) {
+        integer.value += unsigned;
+        integer.unsigned = !!unsigned;
+    }
 }
 
 input.addEventListener('input', () => {
