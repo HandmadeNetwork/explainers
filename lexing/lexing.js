@@ -44,6 +44,12 @@ function lex() {
             continue;
         }
 
+        const floating = lexFloatingConstant();
+        if (floating) {
+            console.log("floating", floating);
+            continue;
+        }
+
         const integer = lexIntegerConstant();
         if (integer) {
             console.log("integer", integer);
@@ -233,6 +239,32 @@ function lexIntegerUnsigned(integer) {
         integer.value += unsigned;
         integer.unsigned = !!unsigned;
     }
+}
+
+const reDecimalFloat = /^(([0-9]*\.[0-9]+|[0-9]+\.)([eE][+-]?[0-9]+)?[flFL]?|[0-9]+([eE][+-]?[0-9]+)[flFL]?)/;
+const reHexFloat = /^0[xX](([0-9a-fA-F]*\.[0-9a-fA-F]+|[0-9a-fA-F]+\.)|[0-9a-fA-F]+)[pP][+-]?[0-9]+[flFL]?/;
+
+function lexFloatingConstant() {
+    // First do a big regex validation so that we bail early without consuming
+    // anything if it's not actually a float. We need to leave chars in the
+    // string for lexing integers in that case.
+    if (!nextIs(reDecimalFloat) && !nextIs(reHexFloat)) {
+        return null;
+    }
+
+    // TODO: Parse more granularly
+
+    const decimalFloat = consumeIfMatch(reDecimalFloat);
+    if (decimalFloat) {
+        return { type: "floating", value: decimalFloat };
+    }
+
+    const hexFloat = consumeIfMatch(reHexFloat);
+    if (hexFloat) {
+        return { type: "floating", value: hexFloat };
+    }
+
+    return null;
 }
 
 input.addEventListener('input', () => {
