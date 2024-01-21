@@ -4,14 +4,6 @@
 const input = document.querySelector("#input");
 const results = document.querySelector("#results");
 
-const keywords = [
-    "auto", "break", "case", "char", "const", "continue", "default", "double",
-    "do", "else", "enum", "extern", "float", "for", "goto", "if", "inline",
-    "int", "long", "register", "restrict", "return", "short", "signed",
-    "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned",
-    "void", "volatile", "while", "_Bool", "_Complex", "_Imaginary",
-];
-
 let source;
 let cur;
 let line, col;
@@ -32,9 +24,9 @@ function lex() {
     while (!eof) {
         consumeWhitespaceAndComments();
 
-        const keyword = lexKeyword();
-        if (keyword) {
-            console.log("keyword", keyword);
+        const punctuator = lexPunctuator();
+        if (punctuator) {
+            console.log("punctuator", punctuator);
             continue;
         }
 
@@ -50,7 +42,7 @@ function lex() {
             continue;
         }
 
-        const identifier = lexIdentifier();
+        const identifier = lexIdentifierOrKeyword();
         if (identifier) {
             console.log("identifier", identifier);
             continue;
@@ -166,20 +158,23 @@ function consumeWhitespaceAndComments() {
     }
 }
 
-function lexKeyword() {
-    for (const keyword of keywords) {
-        if (nextIs(keyword)) {
-            consume(keyword);
-            return { type: "keyword", keyword: keyword };
-        }
-    }
-    return null;
-}
+const keywords = [
+    "auto", "break", "case", "char", "const", "continue", "default", "double",
+    "do", "else", "enum", "extern", "float", "for", "goto", "if", "inline",
+    "int", "long", "register", "restrict", "return", "short", "signed",
+    "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned",
+    "void", "volatile", "while", "_Bool", "_Complex", "_Imaginary",
+];
 
-function lexIdentifier() {
+function lexIdentifierOrKeyword() {
     // TODO: universal-character-name, I guess, bleh
     const ident = consumeIfMatch(/^[a-zA-Z_][a-zA-Z0-9_]*/);
     if (ident) {
+        for (const keyword of keywords) {
+            if (ident === keyword) {
+                return { type: "keyword", keyword: keyword };
+            }
+        }
         return { type: "identifier", name: ident };
     }
     return null;
@@ -298,6 +293,31 @@ function lexStringLiteral() {
     }
     
     return null;
+}
+
+// Punctuators must be sorted by length in order to ensure that e.g. "++" is
+// not parsed as "+" "+".
+const punctuators = [
+    "%:%:",
+    
+    "<<=", ">>=", "...",
+    
+    "<:", ":>", "<%", "%>", "%:", "<<", ">>", "<=", ">=", "##", "->", "++",
+    "--", "*=", "/=", "%=", "+=", "-=", "&=", "^=", "|=", "&&", "||", "==",
+    "!=",
+    
+    "<", ">", ".", "&", "*", "+", "-", "~", "!", "/", "%", "^", "|", "?", ":",
+    ";", "=", ",", "#", "[", "]", "(", ")", "{", "}",
+];
+
+function lexPunctuator() {
+    for (const punctuator of punctuators) {
+        if (nextIs(punctuator)) {
+            consume(punctuator);
+            return { type: "punctuator", value: punctuator };
+        }
+    }
+    return null;    
 }
 
 input.addEventListener('input', () => {
