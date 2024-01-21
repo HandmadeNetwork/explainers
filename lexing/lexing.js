@@ -1,7 +1,8 @@
 // See Annex A.1 of the C spec:
 // https://www.open-std.org/jtc1/sc22/WG14/www/docs/n1256.pdf
 
-const input = document.querySelector("#input");
+const editor = document.querySelector("#editor");
+const highlights = document.querySelector("#highlights");
 const results = document.querySelector("#results");
 
 let source;
@@ -10,17 +11,18 @@ let line, col;
 let eof;
 
 function lex() {
-    source = input.value;
+    source = editor.innerText;
     cur = 0;
     line = 1;
     col = 1;
     eof = false;
 
     if (source.length === 0) {
-        return;
+        eof = true;
     }
 
     console.log("starting lex");
+    const tokens = [];
     while (!eof) {
         consumeWhitespaceAndComments();
         if (eof) {
@@ -29,41 +31,80 @@ function lex() {
 
         const punctuator = lexPunctuator();
         if (punctuator) {
-            console.log("punctuator", punctuator);
+            tokens.push(punctuator);
             continue;
         }
 
         const char = lexCharacterConstant();
         if (char) {
-            console.log("char", char);
+            tokens.push(char);
             continue;
         }
 
         const str = lexStringLiteral();
         if (str) {
-            console.log("string", str);
+            tokens.push(str);
             continue;
         }
 
         const identifier = lexIdentifierOrKeyword();
         if (identifier) {
-            console.log("identifier", identifier);
+            tokens.push(identifier);
             continue;
         }
 
         const floating = lexFloatingConstant();
         if (floating) {
-            console.log("floating", floating);
+            tokens.push(floating);
             continue;
         }
 
         const integer = lexIntegerConstant();
         if (integer) {
-            console.log("integer", integer);
+            tokens.push(integer);
             continue;
         }
 
         throw new Error("failed to lex, bad token");
+    }
+
+    // Highlight tokens
+    {
+        // Track all newlines so we can emit them in our highlights
+        const newlineCurs = [];
+        for (let i = 0; i < source.length; i++) {
+            if (source[i] === "\n") {
+                newlineCurs.push(i);
+            }
+        }
+
+        let highlightHTML = "";
+        let lastCur = 0;
+        for (const token of tokens) {
+            // Emit spaces and newlines until we get to the start of the token
+            while (true) {
+                let nextNewlineCur = null;
+                for (const newlineCur of newlineCurs) {
+                    if (lastCur <= newlineCur && newlineCur < token.loc.cur) {
+                        nextNewlineCur = newlineCur;
+                        break;
+                    }
+                }
+                const numSpaces = Math.min(token.loc.cur, nextNewlineCur ?? token.loc.cur) - lastCur;
+                highlightHTML += " ".repeat(numSpaces);
+                
+                if (nextNewlineCur === null) {
+                    break;
+                }
+                highlightHTML += "\n";
+                lastCur = nextNewlineCur + 1;
+            }
+
+            highlightHTML += `<span class="bg-pink">${ " ".repeat(token.loc.length) }</span>`;
+
+            lastCur = token.loc.cur + token.loc.length;
+        }
+        highlights.innerHTML = highlightHTML;
     }
 }
 
@@ -97,9 +138,11 @@ function bumpCur() {
 }
 
 function advanceBy(n) {
+    const curBefore = cur;
     for (let i = 0; i < n && !eof; i++) {
         bumpCur();
     }
+    return { cur: curBefore, length: n };
 }
 
 function nextIs(s) {
@@ -119,8 +162,7 @@ function consumeIfMatch(r) {
     assert(r.source[0] === "^", `regexp /${r.source}/ was not anchored to the start of the string!`);
     if (nextIs(r)) {
         const m = rest().match(r);
-        consume(m[0]);
-        return m[0];
+        return consume(m[0]);
     }
     return null;
 }
@@ -179,10 +221,10 @@ function lexIdentifierOrKeyword() {
     if (ident) {
         for (const keyword of keywords) {
             if (ident === keyword) {
-                return { type: "keyword", keyword: keyword };
+                return { type: "keyword", loc: ident };
             }
         }
-        return { type: "identifier", name: ident };
+        return { type: "identifier", loc: ident };
     }
     return null;
 }
@@ -199,17 +241,17 @@ function lexIntegerConstant() {
 function lexIntegerConstantNoSuffix() {
     const decimal = consumeIfMatch(/^[1-9][0-9]*/);
     if (decimal) {
-        return { type: "integer", subtype: "decimal", value: decimal };
+        return { type: "integer", subtype: "decimal", loc: decimal };
     }
 
     const hex = consumeIfMatch(/^0[xX][0-9a-fA-F]*/);
     if (hex) {
-        return { type: "integer", subtype: "hex", value: hex };
+        return { type: "integer", subtype: "hex", loc: hex };
     }
 
     const octal = consumeIfMatch(/^0[0-7]*/);
     if (octal) {
-        return { type: "integer", subtype: "octal", value: octal };
+        return { type: "integer", subtype: "octal", loc: octal };
     }
 
     return null;
@@ -234,14 +276,14 @@ function lexIntegerSuffix(integer) {
 function lexIntegerLongth(integer) {
     const longlong = consumeIfMatch(/^(ll|LL)/);
     if (longlong) {
-        integer.value += longlong;
+        integer.loc.length += longlong.length;
         integer.longth = 2;
         return;
     }
     
     const long = consumeIfMatch(/^[lL]/);
     if (long) {
-        integer.value += long;
+        integer.loc.length += long.length;
         integer.longth = 1;
         return;
     }
@@ -250,7 +292,7 @@ function lexIntegerLongth(integer) {
 function lexIntegerUnsigned(integer) {
     const unsigned = consumeIfMatch(/^[uU]/);
     if (unsigned) {
-        integer.value += unsigned;
+        integer.loc.length += unsigned.length;
         integer.unsigned = !!unsigned;
     }
 }
@@ -270,12 +312,12 @@ function lexFloatingConstant() {
 
     const decimalFloat = consumeIfMatch(reDecimalFloat);
     if (decimalFloat) {
-        return { type: "floating", value: decimalFloat };
+        return { type: "floating", loc: decimalFloat };
     }
 
     const hexFloat = consumeIfMatch(reHexFloat);
     if (hexFloat) {
-        return { type: "floating", value: hexFloat };
+        return { type: "floating", loc: hexFloat };
     }
 
     return null;
@@ -287,7 +329,7 @@ const reStringLiteral = /^L?"([^"\\\n]|\\['"?\\abfnrtv]|\\[0-7]{1,3}|\\x[0-9a-fA
 function lexCharacterConstant() {
     const char = consumeIfMatch(reCharConstant);
     if (char) {
-        return { type: "character", value: char };
+        return { type: "character", loc: char };
     }
 
     return null;
@@ -296,7 +338,7 @@ function lexCharacterConstant() {
 function lexStringLiteral() {
     const str = consumeIfMatch(reStringLiteral);
     if (str) {
-        return { type: "string", value: str };
+        return { type: "string", loc: str };
     }
     
     return null;
@@ -320,14 +362,14 @@ const punctuators = [
 function lexPunctuator() {
     for (const punctuator of punctuators) {
         if (nextIs(punctuator)) {
-            consume(punctuator);
-            return { type: "punctuator", value: punctuator };
+            const loc = consume(punctuator);
+            return { type: "punctuator", loc: loc };
         }
     }
     return null;    
 }
 
-input.addEventListener('input', () => {
+editor.addEventListener('input', () => {
     lex();
 });
 lex();
