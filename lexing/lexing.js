@@ -38,6 +38,12 @@ function lex() {
             continue;
         }
 
+        const char = lexCharacterConstant();
+        if (char) {
+            console.log("char", char);
+            continue;
+        }
+
         const identifier = lexIdentifier();
         if (identifier) {
             console.log("identifier", identifier);
@@ -262,6 +268,17 @@ function lexFloatingConstant() {
     const hexFloat = consumeIfMatch(reHexFloat);
     if (hexFloat) {
         return { type: "floating", value: hexFloat };
+    }
+
+    return null;
+}
+
+const reCharConstant = /^L?'([^'\\\n]|\\['"?\\abfnrtv]|\\[0-7]{1,3}|\\x[0-9a-fA-F]+|\\(u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))+'/;
+
+function lexCharacterConstant() {
+    const char = consumeIfMatch(reCharConstant);
+    if (char) {
+        return { type: "character", value: char };
     }
 
     return null;
