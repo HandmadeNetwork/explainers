@@ -23,6 +23,9 @@ function lex() {
     console.log("starting lex");
     while (!eof) {
         consumeWhitespaceAndComments();
+        if (eof) {
+            break;
+        }
 
         const punctuator = lexPunctuator();
         if (punctuator) {
@@ -87,6 +90,10 @@ function bumpCur() {
         col += 1;
     }
     cur += 1;
+
+    if (cur >= source.length) {
+        eof = true;
+    }
 }
 
 function advanceBy(n) {
