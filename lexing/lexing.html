@@ -68,8 +68,119 @@ int getQuadrantXY(int dx, int dy) {
     -- Refer to the full code
     
     -->
-    <p></p>
-    <p></p>
+    <p>
+Implementing a lexer requires that you iterate over the characters of the source code.
+There are two primary observations that your code must do as it passes over the code.
+First, when a new token starts, it must determine what kind of token it is.
+Secondly, it must determine where the end of the token is, hence why it needs to know what kind of token it is.
+Finding the boundaries of a token string is commonly called "matching" or "to match" a token, a term related to regular expressions.
+    </p><p>
+The initial state of the lexer is at the beginning of the input, and starting a new token.
+Source code contains many characters that exist for readability, rather than for semantic reasons, such as extra whitespace characters and code comments. These characters are commonly skipped by the lexer.
+This can in some form be considered to be a match with a special rule that doesn't produce any token.
+    </p>
+    <p>
+Below is a snippet from the lexer used for the interactable element above.
+The strategy employed is to trim away the whitespace and comments, and then try to match each of the token types one at a time.
+    </p>
+    <pre>
+const tokens = [];    
+while (!eof) {
+    consumeWhitespaceAndComments();
+    if (eof) {
+        break;
+    }
+
+    const punctuator = lexPunctuator();
+    if (punctuator) {
+        tokens.push(punctuator);
+        continue;
+    }
+
+    const char = lexCharacterConstant();
+    if (char) {
+        tokens.push(char);
+        continue;
+    }
+
+    const str = lexStringLiteral();
+    if (str) {
+        tokens.push(str);
+        continue;
+    }
+
+    /* ... */
+}
+    </pre>
+    <p>
+The process of matching strings can be done either by hand-coding the mechanism, or by using regular expressions.
+For those unfamiliar with regular expressions, they can be considered a domain-specific language that expresses what a "family" of strings "look like".
+For instance, a regular expression can be used to specify what an integer literal token looks like.
+    </p>
+    <p>
+First, this example showcases an example of hand-coded comparisons.
+The lexPunctuator function simply compares tests the input against each punctuator in the list, and stops if it finds one that matches.
+    </p>
+    <pre>
+// Punctuators must be sorted by length in order to ensure that e.g. "++" is
+// not parsed as "+" "+".
+const punctuators = [
+    "%:%:",
+    
+    "<<=", ">>=", "...",
+    
+    "<:", ":>", "<%", "%>", "%:", "<<", ">>", "<=", ">=", "##", "->", "++",
+    "--", "*=", "/=", "%=", "+=", "-=", "&=", "^=", "|=", "&&", "||", "==",
+    "!=",
+    
+    "<", ">", ".", "&", "*", "+", "-", "~", "!", "/", "%", "^", "|", "?", ":",
+    ";", "=", ",", "#", "[", "]", "(", ")", "{", "}",
+];
+
+function lexPunctuator() {
+    for (const punctuator of punctuators) {
+        if (nextIs(punctuator)) {
+            const loc = consume(punctuator);
+            return { type: "punctuator", loc: loc };
+        }
+    }
+    return null;    
+}
+    </pre>
+    <p>
+The next example is lexCharacterConstact, which uses a regular expression to specify what a character constant token is.
+When using regular expressions, the complexity lies in the specification of the regular expression, rather than in the complexity of the code.
+Regular expressions are a powerful tool that is often used in lexers, and tools such as flex are built to generate efficient lexers based on regular expressions.
+    </p>
+    <pre>
+const reCharConstant = /^L?'([^'\\\n]|\\['"?\\abfnrtv]|\\[0-7]{1,3}|\\x[0-9a-fA-F]+|\\(u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))+'/;
+
+function lexCharacterConstant() {
+    const char = consumeIfMatch(reCharConstant);
+    if (char) {
+        return { type: "character", loc: char };
+    }
+
+    return null;
+}
+    </pre>
+    <p>
+While regular expressions can be very useful, they are not strictly necessary for writing a lexer.
+The matching logic expressed by a regular expression can also be expressed in code, and a regular expression can be viewed as a more compact way to express the logic.
+Whether or not regular expressions are used, and for what tokens, is a design decision that should be made in the context of the use case.
+    </p>
+
+    <br>
+
+    <p>
+Lexing is the process in which the compiler categorizes each piece of the input.
+It keeps only the important information, and trims away whitespace and comments that aren't used later on.
+Lexing can be done using handcrafted comparisons, regular expressions, or both to match characters in the input to produce tokens.
+    </p>
+    <p>
+    <!-- TODO(Zelaven): Make this point to the main branch of the repository-->
+    For the complete source code of the lexer used for the interactable element, please see <a href="https://github.com/HandmadeNetwork/explainers/blob/lexing/lexing/lexing.js">this file</a>.
+    </p>
     <p></p>
     <p></p>
     <p></p>
